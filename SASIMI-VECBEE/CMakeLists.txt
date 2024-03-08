@@ -14,8 +14,10 @@ aux_source_directory(${PROJECT_SOURCE_DIR}/src sources)
 include_directories(${PROJECT_SOURCE_DIR}/abc/src)
 include_directories(${PROJECT_SOURCE_DIR}/inc)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set (CXX_STANDARD 17) 
 # Add definitions
-add_definitions(-DLIN64 -g -Wall -O3 -std=c++2a)
+add_definitions(-DLIN64 -g -Wall -O3 -std=c++17)
 
 # set output path
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR})
