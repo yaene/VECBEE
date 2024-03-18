@@ -10,8 +10,8 @@ Simulator_t::Simulator_t(Abc_Ntk_t * pNtk, int nFrame)
     DASSERT(Abc_NtkIsAigLogic(pNtk) || Abc_NtkIsSopLogic(pNtk) || Abc_NtkIsMappedLogic(pNtk), "network must be in aig, sop or mapped logic");
     this->pNtk = pNtk;
     this->nFrame = nFrame;
-    this->nBlock = (nFrame % 64) ? ((nFrame >> 6) + 1) : (nFrame >> 6);
-    this->nLastBlock = (nFrame % 64)? (nFrame % 64): 64;
+    this->nBlock = (nFrame % 64) ? ((nFrame >> 6) + 1) : (nFrame >> 6); //64 frames per block
+    this->nLastBlock = (nFrame % 64)? (nFrame % 64): 64; // number of frames in last block
     Abc_Obj_t * pObj = nullptr;
     int i = 0;
     maxId = UpdateMaxId();
