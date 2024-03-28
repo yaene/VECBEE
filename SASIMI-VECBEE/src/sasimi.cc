@@ -5,9 +5,10 @@ using namespace std;
 using namespace std::filesystem;
 
 SASIMI_Manager_t::SASIMI_Manager_t(Abc_Ntk_t *pNtk, int nFrame, int maxLevel,
-                                   Metric_t metricType, double errorBound)
+                                   Metric_t metricType, double errorBound,
+                                   int maxIterations)
     : nFrame(nFrame), maxLevel(maxLevel), metricType(metricType),
-      errorBound(errorBound) {}
+      errorBound(errorBound), maxIterations(maxIterations) {}
 
 SASIMI_Manager_t::~SASIMI_Manager_t() {}
 
@@ -26,7 +27,7 @@ void SASIMI_Manager_t::GreedySelection(Abc_Ntk_t *pOriNtk, string outPrefix) {
   random_device rd;
   clock_t st = clock();
   cntRound = 0;
-  while (1) {
+  while (cntRound < maxIterations) {
     cout << "--------------- round " << ++cntRound << " ---------------"
          << endl;
     Simulator_t *pAppSmlt = new Simulator_t(pAppNtk, nFrame);
