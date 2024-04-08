@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
   cout << "abc command " << command.str() << endl;
   DASSERT(!Cmd_CommandExecute(pAbc, command.str().c_str()));
   command.str("");
-  command << "print_stats";
+  command << "aig; print_stats";
   cout << "abc command " << command.str() << endl;
   DASSERT(!Cmd_CommandExecute(pAbc, command.str().c_str()));
 

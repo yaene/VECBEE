@@ -52,7 +52,7 @@ void SASIMI_Manager_t::GreedySelection(Abc_Ntk_t *pOriNtk, string outPrefix) {
     std::cout << "cpm time: "
               << chrono::duration_cast<chrono::microseconds>(cpm - sim).count()
               << std::endl;
-    Abc_NtkDelayTrace(pAppNtk, nullptr, nullptr, 0);
+    Abc_NtkLevel(pAppNtk);
     CollectMFFC(*pAppSmlt, vMffcs);
     auto mffc = chrono::high_resolution_clock::now();
     std::cout << "mffc time: "
@@ -524,10 +524,6 @@ void SASIMI_Manager_t::CollectNodeLACUnderER(
   Abc_Ntk_t *pAppNtk = appSmlt.GetNetwork();
   DASSERT(pAppNtk == pTS->pNtk);
   double errorBoundInt = errorBound * appSmlt.GetFrameNum();
-  double invDelay =
-      Mio_LibraryReadDelayInvMax((Mio_Library_t *)Abc_FrameReadLibGen()) + 0.1;
-  int areaInv = Mio_LibraryReadAreaInv((Mio_Library_t *)Abc_FrameReadLibGen());
-  int areaBuf = Mio_LibraryReadAreaBuf((Mio_Library_t *)Abc_FrameReadLibGen());
   nodeLAC.SetFOM(0.0);
   // consider constant replacement
   Abc_Obj_t *pConst0 = Ckt_GetConst(pAppNtk, 0);
@@ -577,7 +573,7 @@ void SASIMI_Manager_t::CollectNodeLACUnderER(
   Abc_NtkForEachNode(pAppNtk, pSS, i) {
     if (Abc_NodeIsConst(pSS))
       continue;
-    if (Ckt_GetObjArrivalTime(pSS, 3) > Ckt_GetObjArrivalTime(pTS, 3))
+    if (pSS->Level > pTS->Level)
       continue;
     if (pTS == pSS)
       continue;
@@ -609,9 +605,7 @@ void SASIMI_Manager_t::CollectNodeLACUnderER(
     // dErrors.first / static_cast <double>(appSmlt.GetFrameNum()) << "," <<
     // dErrors.second / static_cast <double>(appSmlt.GetFrameNum()) << endl;
     if (baseER + dErrors.first <= errorBoundInt ||
-        (baseER + dErrors.second <= errorBoundInt &&
-         Ckt_GetObjArrivalTime(pTS, 3) >=
-             Ckt_GetObjArrivalTime(pSS, 3) + invDelay * 1000)) {
+        (baseER + dErrors.second <= errorBoundInt && pTS->Level >= pSS->Level + 1)) {
       double dArea = GetDArea(pTS, pSS, vMffcs);
       if (dErrors.first <= dErrors.second) {
         Abc_Obj_t *pFanout = nullptr;
@@ -623,16 +617,14 @@ void SASIMI_Manager_t::CollectNodeLACUnderER(
             break;
           }
         }
-        if (isPoDriver)
-          dArea -= areaBuf;
+        if (isPoDriver) dArea -= 1;
         double tempFOM = dArea / (dErrors.first + 1e-10);
         if ((dErrors.first < 0 && nodeLAC.GetFOM() > tempFOM) ||
             (dErrors.first >= 0 && nodeLAC.GetFOM() >= 0 &&
              nodeLAC.GetFOM() < tempFOM))
           nodeLAC.Update(pTS, pSS, false, dErrors.first, dArea, tempFOM);
-      } else if (Ckt_GetObjArrivalTime(pTS, 3) >=
-                 Ckt_GetObjArrivalTime(pSS, 3) + invDelay * 1000) {
-        dArea -= areaInv;
+      } else if (pTS->Level >= pSS->Level + 1) {
+        dArea -=1;
         double tempFOM = dArea / (dErrors.second + 1e-10);
         if ((dErrors.second < 0 && nodeLAC.GetFOM() > tempFOM) ||
             (dErrors.second >= 0 && nodeLAC.GetFOM() >= 0 &&
@@ -677,14 +669,14 @@ void SASIMI_Manager_t::CollectNodeLACUnderER(
         baseER + dErrors.second <= errorBoundInt) {
       double dArea = GetDArea(pTS, pSS, vMffcs);
       if (dErrors.first <= dErrors.second) {
-        dArea -= areaBuf;
+        dArea -= 1;
         double tempFOM = dArea / (dErrors.first + 1e-10);
         if ((dErrors.first < 0 && nodeLAC.GetFOM() > tempFOM) ||
             (dErrors.first >= 0 && nodeLAC.GetFOM() >= 0 &&
              nodeLAC.GetFOM() < tempFOM))
           nodeLAC.Update(pTS, pSS, false, dErrors.first, dArea, tempFOM);
       } else {
-        dArea -= areaInv;
+        dArea-=1;
         double tempFOM = dArea / (dErrors.second + 1e-10);
         if ((dErrors.second < 0 && nodeLAC.GetFOM() > tempFOM) ||
             (dErrors.second >= 0 && nodeLAC.GetFOM() >= 0 &&
@@ -1159,15 +1151,13 @@ int SASIMI_Manager_t::ApplyBestLAC(Simulator_t &oriSmlt, Simulator_t &appSmlt,
                             ? MeasureER(pOriNtk, pAppNtk, 1000000, seed)
                             : MeasureNMED(pOriNtk, pAppNtk, 1000000, seed);
   cout << "high accuracy error = " << highAccError << endl;
-  cout << "area = " << Ckt_GetArea(pAppNtk) << endl;
-  cout << "delay = " << Ckt_GetDelay(pAppNtk) << endl;
   cout << "#gates = " << Abc_NtkNodeNum(pAppNtk) << endl;
   // if (highAccError > errorBound)
   //     assert(0);
 
   ostringstream command;
   command << outPrefix << "_" << cntRound << "_" << accError << "_"
-          << Ckt_GetArea(pAppNtk) << "_" << Ckt_GetDelay(pAppNtk) << ".blif";
+           << ".blif";
   cout << "output circuit " << command.str() << endl;
   Ckt_WriteBlif(pAppNtk, command.str());
   return 0;
@@ -1354,7 +1344,7 @@ void SASIMI_Manager_t::GetDNMED(IN Simulator_t &appSmlt,
 
 double SASIMI_Manager_t::GetDArea(Abc_Obj_t *pTS, Abc_Obj_t *pSS,
                                   vector<Vec_Ptr_t *> &vMffcs) {
-  DASSERT(Abc_NtkIsMappedLogic(pTS->pNtk) && pTS->pNtk == pSS->pNtk);
+  DASSERT(pTS->pNtk == pSS->pNtk);
   Abc_Obj_t *pObj = nullptr;
   int i = 0;
   set<Abc_Obj_t *> m1;
@@ -1372,12 +1362,7 @@ double SASIMI_Manager_t::GetDArea(Abc_Obj_t *pTS, Abc_Obj_t *pSS,
   iter = set_difference(m1.begin(), m1.end(), mInter.begin(), mInter.end(),
                         mDiff.begin());
   mDiff.resize(iter - mDiff.begin());
-
-  double dArea = 0;
-  for (auto &pObj : mDiff)
-    dArea += Mio_GateReadArea((Mio_Gate_t *)pObj->pData);
-
-  return dArea;
+  return mDiff.size();
 }
 
 void SASIMI_Manager_t::ReplaceObj(Abc_Obj_t *pNodeOld, Abc_Obj_t *pNodeNew) {
